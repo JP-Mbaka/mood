@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mood/models/mood_entry.dart';
+import 'package:mood/providers/mood_provider.dart';
 import 'package:mood/screens/widgets/mood_selector.dart';
 import 'package:mood/screens/widgets/timeline_card.dart';
 
@@ -11,6 +12,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  final MoodProvider _provider = MoodProvider();
   MoodType? _selectedMood;
   bool _logged = false;
 
@@ -19,7 +21,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void initState() {
-    super.initState(); // ← MOVE THIS TO THE TOP
+    super.initState();
+
+    // Add listener here (initState is fine for this)
+    _provider.addListener(() {
+      if (mounted) setState(() {});
+    });
 
     _logButtonController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -32,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _provider.dispose();
     _logButtonController.dispose();
     super.dispose();
   }
@@ -41,6 +49,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     await _logButtonController.forward();
     await _logButtonController.reverse();
+
+    // Save the entry via provider
+    await _provider.addEntry(_selectedMood!);
 
     setState(() {
       _logged = true;
@@ -54,6 +65,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    // Pull live data from provider
+    final recentEntries = _provider.recentEntries;
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -62,10 +76,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               minHeight: MediaQuery.of(context).size.height,
             ),
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
               child: Column(
-                // crossAxisAlignment: CrossAxisAlignment.center,
-                // mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,6 +174,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       }).toList(),
                     ),
                   const SizedBox(height: 32),
+
                   // ─── Log Button ───
                   if (!_logged)
                     AnimatedBuilder(
@@ -231,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   const SizedBox(height: 56),
 
                   // ─── Timeline ───
-                  if (1 + 1 == 2) ...[
+                  if (recentEntries.isNotEmpty) ...[
                     Row(
                       children: [
                         const Text(
@@ -253,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            'Last 2',
+                            'Last ${recentEntries.length}',
                             style: const TextStyle(
                               color: Colors.white38,
                               fontSize: 12,
@@ -262,6 +275,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                         const Spacer(),
                         GestureDetector(
+                          onTap: () => _provider.clearAll(),
                           child: const Text(
                             'Clear',
                             style: TextStyle(
@@ -277,13 +291,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       height: 200,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
-                        itemCount: 2,
-                        itemBuilder: (context, index) => TimelineCard(
-                          entry: MoodEntry(
-                            mood: MoodType.happy,
-                            timestamp: DateTime.now(),
-                          ),
-                        ),
+                        itemCount: recentEntries.length,
+                        itemBuilder: (context, index) =>
+                            TimelineCard(entry: recentEntries[index]),
                       ),
                     ),
                   ],
